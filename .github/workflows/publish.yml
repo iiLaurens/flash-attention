@@ -112,6 +112,9 @@ jobs:
           ls dist/*whl |xargs -I {} mv {} dist/${wheel_name}
           echo "wheel_name=${wheel_name}" >> $GITHUB_ENV
 
-      - name: Log Built Wheels
-        run: |
-          ls dist
+      - name: Push artifacts Built Wheels
+        uses: actions/upload-artifact@v2
+        with: 
+          name: wheels
+          path: dist
+      
