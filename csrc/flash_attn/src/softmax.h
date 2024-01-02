@@ -185,7 +185,7 @@ inline __device__ void apply_mask_local(Tensor<Engine, Layout> &tensor, const in
     // Default to not using PrefixLM
     apply_mask_local</*HasWSLeft=*/HasWSLeft>(tensor, col_idx_offset_, max_seqlen_k, row_idx_offset,
                                               max_seqlen_q, warp_row_stride, window_size_left, window_size_right, 0);
-{
+}
 
 template <typename Engine, typename Layout>
 inline __device__ void apply_mask_causal(Tensor<Engine, Layout> &tensor, const int col_idx_offset_,
