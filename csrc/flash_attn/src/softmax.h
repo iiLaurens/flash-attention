@@ -163,7 +163,7 @@ inline __device__ void apply_mask_local(Tensor<Engine, Layout> &tensor, const in
                 #pragma unroll
                 for (int j = 0; j < size<1, 0>(tensor); ++j) {
                     const int col_idx = col_idx_base + j;
-                    if (col_idx >= col_idx_limit_right || (HasWSLeft && col_idx < col_idx_limit_left)) && (col_idx >= prefix_left) {
+                    if ((col_idx >= col_idx_limit_right || (HasWSLeft && col_idx < col_idx_limit_left)) && (col_idx >= prefix_left)) {
                         tensor(make_coord(i, mi), make_coord(j, nj)) = -INFINITY;
                     }
                 }
