@@ -203,7 +203,7 @@ inline __device__ void apply_mask_causal(Tensor<Engine, Layout> &tensor, const i
                                          const int max_seqlen_q, const int warp_row_stride) {
     // Default to not using PrefixLM
     apply_mask_causal(tensor, col_idx_offset_, max_seqlen_k, row_idx_offset,
-                      max_seqlen_q, warp_row_stride, -1, 0, 0);
+                      max_seqlen_q, warp_row_stride, 0);
 }
 
 template <typename Engine0, typename Layout0, typename Engine1, typename Layout1>
