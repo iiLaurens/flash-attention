@@ -20,6 +20,7 @@ struct BlockInfo {
         // Otherwise it's cu_seqlens_k[bidb], i.e., we use cu_seqlens_k to store the sequence lengths of K.
         , seqlen_k_cache(!Varlen || params.cu_seqlens_k == nullptr ? params.seqlen_k : (params.is_seqlens_k_cumulative ? params.cu_seqlens_k[bidb + 1] - sum_s_k : params.cu_seqlens_k[bidb]))
         , actual_seqlen_k(params.seqused_k ? params.seqused_k[bidb] : seqlen_k_cache + (params.knew_ptr == nullptr ? 0 : params.seqlen_knew))
+        , seqlen_attn_prefix(params.seqlens_attn_prefix == nullptr ? 0 : params.seqlens_attn_prefix[bidb])
         {
         }
 
@@ -39,6 +40,7 @@ struct BlockInfo {
     // We have to have seqlen_k_cache declared before actual_seqlen_k, otherwise actual_seqlen_k is set to 0.
     const int seqlen_k_cache;
     const int actual_seqlen_k;
+    const int seqlen_attn_prefix;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

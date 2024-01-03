@@ -42,7 +42,8 @@ void set_params_fprop(Flash_fwd_params &params,
                       float p_dropout,
                       float softmax_scale,
                       int window_size_left,
-                      int window_size_right) {
+                      int window_size_right,
+                      void *seqlens_attn_prefix_d) {
 
     // Reset the parameters
     memset(&params, 0, sizeof(params));
@@ -74,6 +75,8 @@ void set_params_fprop(Flash_fwd_params &params,
     params.cu_seqlens_q = static_cast<int *>(cu_seqlens_q_d);
     params.cu_seqlens_k = static_cast<int *>(cu_seqlens_k_d);
     params.seqused_k = static_cast<int *>(seqused_k);
+
+    params.seqlens_attn_prefix = static_cast<int *>(seqlens_attn_prefix_d);
 
     // P = softmax(QK^T)
     params.p_ptr = p_d;
@@ -151,7 +154,8 @@ void set_params_dgrad(Flash_bwd_params &params,
                       float softmax_scale,
                       int window_size_left,
                       int window_size_right,
-                      bool deterministic) {
+                      bool deterministic,
+                      void *seqlens_attn_prefix_d) {
 
     set_params_fprop(params,
                      b, seqlen_q, seqlen_k, seqlen_q_rounded, seqlen_k_rounded, h, h_k, d, d_rounded,
@@ -164,7 +168,8 @@ void set_params_dgrad(Flash_bwd_params &params,
                      p_dropout,
                      softmax_scale,
                      window_size_left,
-                     window_size_right);
+                     window_size_right,
+                     seqlens_attn_prefix_d);
 
     // Set the pointers and strides.
     params.do_ptr = dout.data_ptr();
@@ -263,6 +268,7 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x head_size
         int window_size_left,
         int window_size_right,
         const bool return_softmax,
+        c10::optional<at::Tensor> &seqlens_attn_prefix, // batch size
         c10::optional<at::Generator> gen_) {
 
     auto dprops = at::cuda::getCurrentDeviceProperties();
@@ -380,7 +386,8 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x head_size
                      p_dropout,
                      softmax_scale,
                      window_size_left,
-                     window_size_right);
+                     window_size_right,
+                     seqlens_attn_prefix.has_value() ? seqlens_attn_prefix.value().data_ptr() : nullptr);
 
     // This needs to match with run_mha_fwd_splitkv_dispatch
     const int block_n = head_size <= 64 ? 256 : (head_size <= 128 ? 128 : 64);
@@ -471,6 +478,7 @@ mha_varlen_fwd(const at::Tensor &q,  // total_q x num_heads x head_size, total_q
                int window_size_left,
                int window_size_right,
                const bool return_softmax,
+               c10::optional<at::Tensor> &seqlens_attn_prefix,
                c10::optional<at::Generator> gen_) {
 
     if (is_causal) { window_size_right = 0; }
@@ -596,7 +604,8 @@ mha_varlen_fwd(const at::Tensor &q,  // total_q x num_heads x head_size, total_q
                      p_dropout,
                      softmax_scale,
                      window_size_left,
-                     window_size_right);
+                     window_size_right,
+                     seqlens_attn_prefix.has_value() ? seqlens_attn_prefix.value().data_ptr() : nullptr);
 
     // number of times random will be generated per thread, to offset philox counter in thc random
     // state
@@ -684,6 +693,7 @@ mha_bwd(const at::Tensor &dout,  // batch_size x seqlen_q x num_heads, x head_si
         int window_size_left,
         int window_size_right,
         const bool deterministic,
+        c10::optional<at::Tensor> &seqlens_attn_prefix,
         c10::optional<at::Generator> gen_,
         c10::optional<at::Tensor> &rng_state) {
 
@@ -844,7 +854,9 @@ mha_bwd(const at::Tensor &dout,  // batch_size x seqlen_q x num_heads, x head_si
                      softmax_scale,
                      window_size_left,
                      window_size_right,
-                     deterministic);
+                     deterministic,
+                     seqlens_attn_prefix.has_value() ? seqlens_attn_prefix.value().data_ptr() : nullptr
+                     );
     params.dq_accum_split_stride = !deterministic ? 0 : dq_accum.stride(0);
 
     auto launch = &run_mha_bwd;
@@ -924,6 +936,7 @@ mha_varlen_bwd(const at::Tensor &dout,  // total_q x num_heads, x head_size
                int window_size_left,
                int window_size_right,
                const bool deterministic,
+               c10::optional<at::Tensor> &seqlens_attn_prefix,   // b
                c10::optional<at::Generator> gen_,
                c10::optional<at::Tensor> &rng_state) {
 
@@ -1100,7 +1113,9 @@ mha_varlen_bwd(const at::Tensor &dout,  // total_q x num_heads, x head_size
                      softmax_scale,
                      window_size_left,
                      window_size_right,
-                     deterministic);
+                     deterministic,
+                     seqlens_attn_prefix.has_value() ? seqlens_attn_prefix.value().data_ptr() : nullptr
+                     );
     params.dq_accum_split_stride = !deterministic ? 0 : dq_accum.stride(0);
 
     auto launch = &run_mha_bwd;
@@ -1175,7 +1190,8 @@ mha_fwd_kvcache(at::Tensor &q,                 // batch_size x seqlen_q x num_he
                 int window_size_left,
                 int window_size_right,
                 bool is_rotary_interleaved,   // if true, rotary combines indices 0 & 1, else indices 0 & rotary_dim / 2
-                int num_splits
+                int num_splits,
+                c10::optional<const at::Tensor> &seqlens_attn_prefix_ // batch_size
                 ) {
 
     auto dprops = at::cuda::getCurrentDeviceProperties();
@@ -1288,7 +1304,8 @@ mha_fwd_kvcache(at::Tensor &q,                 // batch_size x seqlen_q x num_he
                      /*p_dropout=*/0.f,
                      softmax_scale,
                      window_size_left,
-                     window_size_right);
+                     window_size_right,
+                     /*seqlens_attn_prefix=*/seqlens_attn_prefix_.has_value() ? seqlens_attn_prefix_.value().data_ptr() : nullptr);
 
     at::Tensor k, v, k_padded, v_padded;
     if (k_.has_value()) {

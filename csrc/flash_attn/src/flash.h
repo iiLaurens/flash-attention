@@ -80,6 +80,10 @@ struct Flash_fwd_params : public Qkv_params {
     // If provided, the actual length of each k sequence.
     int * __restrict__ seqused_k;
 
+    // Optional array of length b containing the length of the attention prefix
+    // for each sequence in the batch.
+    int * __restrict__ seqlens_attn_prefix;
+
     int *__restrict__ blockmask;
 
     // The K_new and V_new matrices.
