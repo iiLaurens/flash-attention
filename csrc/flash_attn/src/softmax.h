@@ -177,16 +177,6 @@ inline __device__ void apply_mask_local(Tensor<Engine, Layout> &tensor, const in
     }
 }
 
-template <bool HasWSLeft=true, typename Engine, typename Layout>
-inline __device__ void apply_mask_local(Tensor<Engine, Layout> &tensor, const int col_idx_offset_,
-                                        const int max_seqlen_k, const int row_idx_offset,
-                                        const int max_seqlen_q, const int warp_row_stride,
-                                        const int window_size_left, const int window_size_right) {
-    // Default to not using PrefixLM
-    apply_mask_local</*HasWSLeft=*/HasWSLeft>(tensor, col_idx_offset_, max_seqlen_k, row_idx_offset,
-                                              max_seqlen_q, warp_row_stride, window_size_left, window_size_right, 0);
-}
-
 template <typename Engine, typename Layout>
 inline __device__ void apply_mask_causal(Tensor<Engine, Layout> &tensor, const int col_idx_offset_,
                                          const int max_seqlen_k, const int row_idx_offset,
@@ -195,15 +185,6 @@ inline __device__ void apply_mask_causal(Tensor<Engine, Layout> &tensor, const i
     // Causal masking is equivalent to local masking with window_size_left = infinity and window_size_right = 0
     apply_mask_local</*HasWSLeft=*/false>(tensor, col_idx_offset_, max_seqlen_k, row_idx_offset,
                                           max_seqlen_q, warp_row_stride, -1, 0, seqlen_prefix);
-}
-
-template <typename Engine, typename Layout>
-inline __device__ void apply_mask_causal(Tensor<Engine, Layout> &tensor, const int col_idx_offset_,
-                                         const int max_seqlen_k, const int row_idx_offset,
-                                         const int max_seqlen_q, const int warp_row_stride) {
-    // Default to not using PrefixLM
-    apply_mask_causal(tensor, col_idx_offset_, max_seqlen_k, row_idx_offset,
-                      max_seqlen_q, warp_row_stride, 0);
 }
 
 template <typename Engine0, typename Layout0, typename Engine1, typename Layout1>

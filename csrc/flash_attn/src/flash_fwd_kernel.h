@@ -398,7 +398,8 @@ inline __device__ void compute_attn_1rowblock(const Params &params, const int bi
                 // m_block * kBlockM + get<0>(idx_row(0)),
                 m_block * kBlockM + (tidx / 32) * 16 + (tidx % 32) / 4,
                 binfo.actual_seqlen_q, kNWarps * 16,
-                params.window_size_left, params.window_size_right
+                params.window_size_left, params.window_size_right,
+                binfo.seqlen_attn_prefix
                 // m_block * kBlockM + (tidx / 32) * 16, kNWarps * 16
                 // m_block * kBlockM + (tidx / 32) * (kBlockM / kNWarps), 16
             );
@@ -501,7 +502,8 @@ inline __device__ void compute_attn_1rowblock(const Params &params, const int bi
                 scores, n_block * kBlockN, binfo.actual_seqlen_k,
                 m_block * kBlockM + (tidx / 32) * 16 + (tidx % 32) / 4,
                 binfo.actual_seqlen_q, kNWarps * 16,
-                params.window_size_left, params.window_size_right
+                params.window_size_left, params.window_size_right,
+                binfo.seqlen_attn_prefix
             );
         }
 
@@ -997,7 +999,8 @@ inline __device__ void compute_attn_1rowblock_splitkv(const Params &params, cons
             flash::apply_mask_local(scores, n_block * kBlockN, binfo.actual_seqlen_k,
                                     m_block * kBlockM + (tidx / 32) * 16 + (tidx % 32) / 4,
                                     binfo.actual_seqlen_q, kNWarps * 16,
-                                    params.window_size_left, params.window_size_right
+                                    params.window_size_left, params.window_size_right,
+                                    binfo.seqlen_attn_prefix
                                     );
         }
 
@@ -1084,7 +1087,8 @@ inline __device__ void compute_attn_1rowblock_splitkv(const Params &params, cons
                 scores, n_block * kBlockN, binfo.actual_seqlen_k,
                 m_block * kBlockM + (tidx / 32) * 16 + (tidx % 32) / 4,
                 binfo.actual_seqlen_q, kNWarps * 16,
-                params.window_size_left, params.window_size_right
+                params.window_size_left, params.window_size_right,
+                binfo.seqlen_attn_prefix
             );
         }
         softmax_rescale_o</*Is_first=*/false, /*Check_inf=*/Is_local>(scores, scores_max, scores_sum, acc_o, params.scale_softmax_log2);
